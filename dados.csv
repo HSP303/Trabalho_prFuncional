@@ -1,7 +1,8 @@
 #versao,1
-CONFIG,SALDO,10.0
+CONFIG,SALDO,6.0
 CONFIG,META,10000
 CATEGORIA,Contas
 CATEGORIA,Superficial
 EXTRATO,"['Valor:', 60.0, ' Saldo: ', 60.0, ' - ', '2025-10-26']"
 EXTRATO,"['Valor:', -50.0, ' Categoria: ', 'Contas', ' Saldo: ', 10.0, ' - ', '2025-10-26']"
+EXTRATO,"['Valor:', -4.0, ' Categoria: ', 'Superficial', ' Saldo: ', 6.0, ' - ', '2025-10-26']"

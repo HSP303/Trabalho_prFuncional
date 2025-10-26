@@ -71,13 +71,15 @@ def load_state(saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao, arq
         categorias = categorias_padrao[:]
     return saldo, meta, categorias, extrato
 
-def imprimirMenu():
+def imprimirMenu(saldo):
     try:
         os.system('clear')
     except:
         os.system('cls')
-    print("""
-=== MENU ===
+    print(f"""
+============= MENU =============
+Alunos: Pedro Henrique Scheidt e Vinicius Antônio Minas
+Saldo em conta: {saldo}
 1 - Entrada
 2 - Saída
 3 - Cadastrar Meta
@@ -172,7 +174,7 @@ def listarExtrato(extrato):
 saldo, meta, categorias, extrato = load_state(saldo, meta, categorias, extrato)
 
 while True:
-    imprimirMenu()
+    imprimirMenu(saldo)
 
     opc = input('Escolha uma Opção: ').strip()
     print()
