@@ -1,52 +1,122 @@
 import os
 import time
-import re
+import csv
+import ast
+from datetime import date, datetime
+
+ARQUIVO_DADOS = "dados.csv"
 
 categorias = ['Contas', 'Superficial']
 meta = 10000
 saldo = 0
+extrato = []
 
-meta_nome = 'Objetivo'
-meta_prazo = ''  # opcional
+metas_por_categoria = {}  # ex.: {"Alimentação": 800.0}
 
-metas_por_categoria = {}       # ex.: {"Alimentação": 800.0}
-gastos_por_categoria = {}      # acumulador "geral" (legado)
-gastos_cat_por_periodo = {}    # ex.: {"2025-10": {"Alimentação": 350.0}}
-ultimo_movimento_valor = 0.0   # armazena o valor da última saída
+def _serializar_extrato_item(item):
+    conv = []
+    for x in item:
+        if isinstance(x, date):
+            conv.append(x.isoformat())
+        else:
+            conv.append(x)
+    return conv
 
-periodo_atual = ""
 
-def imprimirMenu():
-    #os.system('clear')
-    print("""
-=== MENU ===
+def save_state(saldo, meta, categorias, extrato, arquivo=ARQUIVO_DADOS):
+    with open(arquivo, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["#versao", 1])
+        w.writerow(["CONFIG", "SALDO", saldo])
+        w.writerow(["CONFIG", "META", meta])
+        for cat in categorias:
+            w.writerow(["CATEGORIA", cat])
+        for item in extrato:
+            w.writerow(["EXTRATO", repr(_serializar_extrato_item(item))])
+
+
+def load_state(saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao, arquivo=ARQUIVO_DADOS):
+    if not os.path.exists(arquivo):
+        return saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao
+
+    saldo = saldo_padrao
+    meta = meta_padrao
+    categorias = []
+    extrato = []
+
+    try:
+        with open(arquivo, "r", newline="", encoding="utf-8") as f:
+            r = csv.reader(f)
+            for row in r:
+                if not row:
+                    continue
+                t = row[0]
+                if t == "#versao":
+                    continue
+                if t == "CONFIG" and len(row) >= 3:
+                    if row[1] == "SALDO":
+                        try:
+                            saldo = float(row[2])
+                        except:
+                            pass
+                    elif row[1] == "META":
+                        try:
+                            meta = int(float(row[2]))
+                        except:
+                            pass
+                elif t == "CATEGORIA" and len(row) >= 2:
+                    categorias.append(row[1])
+                elif t == "EXTRATO" and len(row) >= 2:
+                    try:
+                        item = ast.literal_eval(row[1])
+                        extrato.append(item)
+                    except:
+                        extrato.append([row[1]])
+    except:
+        return saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao
+
+    if not categorias:
+        categorias = categorias_padrao[:]
+    return saldo, meta, categorias, extrato
+
+
+def imprimirMenu(saldo):
+    try:
+        os.system('clear')
+    except:
+        os.system('cls')
+    print(f"""
+============= MENU =============
+Alunos: Pedro Henrique Scheidt e Vinícius Antônio Minas
+Saldo em conta: {saldo}
 1 - Entrada
 2 - Saída
 3 - Cadastrar Meta
-4 - Cadastrar Categoria
-5 - Sair do Tédio (Precisa ter o telnet instalado e no PATH)
-6 - Ver Atingimento de Metas (mês)
-7 - Selecionar Período (YYYY-MM)
-8 - Top 3 gastos no mês
+4 - Cadastrar Categoria    
+5 - Mostrar Extrato
+6 - Sair do Tédio (Precisa ter o telnet instalado e no PATH)
+7 - Salvar Dados
 0 - Sair
     """)
 
 def validaNum(valor, floatInt):
-    valido = True
-    msg = ''
+
     try:
         if floatInt == 1:
             valor = float(valor)
         else:
             valor = int(valor)
     except:
-        valido = False
-        msg = 'O valor não é um número. Digite um valor válido!'
-        return (valido, msg)
-    if(valor <= 0):
-        valido = False
-        msg = 'Digite uma valor maior que zero!'
-    return (valido, msg)
+        return (False, 'O valor não é um número. Digite um valor válido!')
+
+    if floatInt == 1:
+        if valor < 0:
+            return (False, 'Digite um valor não negativo!')
+    else:
+        if valor <= 0:
+            return (False, 'Digite um valor maior que zero!')
+
+    return (True, '')
 
 def entrada(saldo):
     eValido = False
@@ -55,105 +125,254 @@ def entrada(saldo):
         eValido, msg = validaNum(valor, 1)
         print(msg)
     valor = float(valor)
-    return sum([saldo, valor])
+    return (sum([saldo, valor]), valor)
 
 def saida(saldo):
-    global ultimo_movimento_valor
     eValido = False
     while eValido == False:
         valor = input('Qual valor sairá da conta? ')
         eValido, msg = validaNum(valor, 1)
         print(msg)
     valor = float(valor)
-    ultimo_movimento_valor = valor
-    return saldo - valor
+    return ((saldo - valor), valor)
 
 def validaCategoria(i, categorias):
-    eValido = True
-    msg = ''
     eValido, msg = validaNum(i, 0)
-    if(eValido == False):
-        return(eValido, msg)
+    if not eValido:
+        return (False, msg)
     i = int(i)
-    if(i > len(categorias)):
-        eValido = False
-        msg = 'Essa categoria não existe!'
-        return (eValido, msg)
-    return (eValido, categorias[i - 1])
+    if i > len(categorias):
+        return (False, 'Essa categoria não existe!')
+    return (True, categorias[i - 1])
 
 def categorizar(categorias):
     eValido = False
     print('## Categorias de despesas ##')
-    _ = list(map(lambda t: print(f"{t[0]+1} - {t[1]}"), enumerate(categorias)))
+    _ = list(map(lambda t: print(f"{t[0] + 1} - {t[1]}"), enumerate(categorias)))
     print()
     while eValido == False:
         categoriaIndex = input('Categoria: ')
         eValido, msg = validaCategoria(categoriaIndex, categorias)
-        if(eValido == False):
+        if (eValido == False):
             print(msg)
     return msg
 
-def cadastrarMeta():
-    global meta, meta_nome, meta_prazo
-    nome = input("Nome da meta (ex.: Viagem, Carro): ").strip()
-    if nome:
-        meta_nome = nome
+def listarExtrato(extrato):
+    try:
+        os.system('clear')
+    except:
+        os.system('cls')
+    print('=== Extrato ===')
+    for linha in extrato:
+        print(f'# {linha}')
+    print('===============')
 
-    eValido = False
-    while eValido == False:
-        valor = input('Qual valor deseja alcançar? ')
-        eValido, msg = validaNum(valor, 1)
-        print(msg)
-    meta = float(valor)
-
-    prazo = input("Prazo (opcional YYYY-MM): ").strip()
-    if prazo:
-        meta_prazo = prazo
-
-    print(f"Meta definida: {meta_nome} | alvo R$ {meta:.2f}" + (f" | prazo {meta_prazo}" if meta_prazo else ""))
-    mostrarProgresso()
-
-def mostrarProgresso():
-    if meta and meta > 0:
-        perc = (saldo / meta) * 100
-        restante = meta - saldo
-        if restante < 0: restante = 0
-        print(f"Progresso da meta '{meta_nome}': {perc:.2f}% | faltam R$ {restante:.2f}")
-    else:
-        print("Sem meta definida")
-
-def alertarMeta():
-    if meta and meta > 0:
-        perc = (saldo / meta) * 100
-        if perc >= 100:
-            print(f"[META] '{meta_nome}' alcançada com êxito")
-        elif perc >= 90:
-            print(f"[ALERTA] meta: '{meta_nome}' em {perc:.1f}% do objetivo.")
-
-def cadastrarMetaCategoria():
-    cat = categorizar(categorias)
-    if not isinstance(cat, str):
+    periodo = input("Ver RESUMO por período (YYYY-MM) [Enter = mês atual]: ").strip()
+    if not periodo:
+        hoje = date.today()
+        periodo = f"{hoje.year:04d}-{hoje.month:02d}"
+    if not _validar_periodo(periodo):
+        print("Período inválido. (Use YYYY-MM)")
         return
-    eValido = False
-    while eValido == False:
-        v = input(f"Meta (valor alvo) para a categoria '{cat}': ")
-        eValido, msg = validaNum(v, 1)
-        print(msg)
-    metas_por_categoria[cat] = float(v)
-    print(f"Meta da categoria '{cat}' definida em R$ {metas_por_categoria[cat]:.2f}")
 
-def alertarMetaCategoria(cat):
-    if cat in metas_por_categoria:
+    resumo = resumo_periodo_puro(extrato, periodo)
+    print(f"\n=== Resumo do período {periodo} ===")
+    print(
+        f"Receitas: R$ {resumo['receitas']:.2f} | Despesas: R$ {resumo['despesas']:.2f} | Saldo do período: R$ {resumo['saldo_periodo']:.2f}")
 
-        gastos_mes = gastos_cat_por_periodo.get(periodo_atual, {})
-        gasto = gastos_mes.get(cat, 0.0)
-        alvo  = metas_por_categoria[cat]
-        if alvo > 0:
-            perc = (gasto / alvo) * 100
+    # Top-3 gastos
+    if resumo['top3']:
+        print("\nTop-3 gastos por categoria:")
+        for i, (cat, tot) in enumerate(resumo['top3'], 1):
+            print(f"{i}) {cat}: R$ {tot:.2f}")
+    else:
+        print("\nTop-3 gastos por categoria: (sem despesas no período)")
+
+    # Atingimento de metas por categoria
+    if metas_por_categoria:
+        print("\nAtingimento de metas por categoria:")
+        linhas = atingimento_metas_categoria_puro(metas_por_categoria, resumo['gastos_por_categoria'])
+        for cat, gasto, alvo, perc in linhas:
+            alert = ""
             if perc >= 100:
-                print(f"[META/CATEGORIA] '{cat}' estourou a meta! ({perc:.1f}%)")
+                alert = "  [META/CATEGORIA atingida]"
             elif perc >= 90:
-                print(f"[ALERTA/CATEGORIA] '{cat}' em {perc:.1f}% da meta.")
+                alert = "  [ALERTA ≥90%]"
+            print(f"- {cat}: gasto R$ {gasto:.2f} / meta R$ {alvo:.2f} ({perc:.1f}%)" + alert)
+    else:
+        print("\nAtingimento de metas por categoria: (sem metas definidas)")
+
+    # Invariante no período
+    ok = abs((resumo['receitas'] - resumo['despesas']) - resumo['delta_saldo']) < 1e-6
+    status = "OK" if ok else "QUEBRA"
+    print(f"\nInvariante (receitas - despesas == Δsaldo): {status}")
+    print(f"   receitas - despesas = R$ {resumo['receitas'] - resumo['despesas']:.2f}")
+    print(f"   Δsaldo = R$ {resumo['delta_saldo']:.2f}")
+
+
+# ----------------- Funções puras / imutáveis em metas e categorias -----------------
+def definir_meta_puro(meta_atual, valor_numerico):
+    # PURA: retorna nova meta global (float).
+    return float(valor_numerico)
+
+def definir_meta_categoria_puro(metas_dict, categoria, valor_numerico):
+    # Pura/imutável: retorna novo dict de metas por categoria.
+    return {**metas_dict, categoria: float(valor_numerico)}
+
+def adicionar_categoria_puro(categorias_atual, nome):
+    # Pura/imutável: retorna nova lista (não muta a original).
+    nome_norm = (nome or "").strip()
+    if not nome_norm:
+        return categorias_atual
+    if nome_norm in categorias_atual:
+        return categorias_atual
+    return categorias_atual + [nome_norm]
+
+def _validar_periodo(s):
+    try:
+        if len(s) != 7 or s[4] != '-':
+            return False
+        y, m = s.split('-')
+        y = int(y);
+        m = int(m)
+        return 1 <= m <= 12
+    except:
+        return False
+
+def _parse_data(obj):
+    if isinstance(obj, date):
+        return obj
+    if isinstance(obj, str) and len(obj) == 10 and obj[4] == '-' and obj[7] == '-':
+        try:
+            return date.fromisoformat(obj)
+        except:
+            return None
+    return None
+
+def _parse_item(item):
+    # Pura: extrai valor, categoria (ou None), saldo e data de um item do extrato.
+    valor = None
+    categoria = None
+    saldo_linha = None
+    data_linha = None
+    for i, x in enumerate(item):
+        if x == 'Valor:' and i + 1 < len(item):
+            try:
+                valor = float(item[i + 1])
+            except:
+                pass
+        if isinstance(x, str) and x.strip() == 'Categoria:' and i + 1 < len(item):
+            categoria = item[i + 1]
+        if isinstance(x, str) and x.strip() == 'Saldo:' and i + 1 < len(item):
+            try:
+                saldo_linha = float(item[i + 1])
+            except:
+                pass
+        if i == len(item) - 1:
+            data_linha = _parse_data(x)
+    return {
+        'valor': valor if valor is not None else 0.0,
+        'categoria': categoria,
+        'saldo': saldo_linha if saldo_linha is not None else 0.0,
+        'data': data_linha,
+    }
+
+
+def resumo_periodo_puro(extrato, periodo_yyyy_mm):
+    # função pura: computa receitas, despesas, top 3, gastos por categoria e  saldo no período.
+    regs = []
+    for it in extrato:
+        r = _parse_item(it)
+        if r['data'] is None:
+            continue
+        mes = f"{r['data'].year:04d}-{r['data'].month:02d}"
+        if mes == periodo_yyyy_mm:
+            regs.append(r)
+
+    receitas = sum(r['valor'] for r in regs if r['valor'] > 0)
+    despesas = sum((-r['valor']) for r in regs if r['valor'] < 0)
+
+    # gastos por categoria (somente despesas)
+    gastos_por_categoria = {}
+    for r in regs:
+        if r['valor'] < 0 and r['categoria']:
+            gastos_por_categoria[r['categoria']] = gastos_por_categoria.get(r['categoria'], 0.0) + (-r['valor'])
+
+    # top-3
+    top3 = sorted(gastos_por_categoria.items(), key=lambda kv: kv[1], reverse=True)[:3]
+
+    # delta de saldo do período, estimando saldo antes do 1º lançamento do mês
+    if regs:
+        regs_ordenado = regs  # já estão na ordem de inserção
+        saldo_depois_primeiro = regs_ordenado[0]['saldo']
+        valor_primeiro = regs_ordenado[0]['valor']
+        saldo_antes_primeiro = saldo_depois_primeiro - valor_primeiro
+        saldo_fim = regs_ordenado[-1]['saldo']
+        delta_saldo = saldo_fim - saldo_antes_primeiro
+    else:
+        delta_saldo = 0.0
+
+    return {
+        'receitas': receitas,
+        'despesas': despesas,
+        'saldo_periodo': receitas - despesas,
+        'gastos_por_categoria': gastos_por_categoria,
+        'top3': top3,
+        'delta_saldo': delta_saldo,
+    }
+
+
+def atingimento_metas_categoria_puro(metas_por_cat, gastos_por_cat_periodo):
+    # PURA: retorna lista (cat, gasto, meta, %) para exibição de metas por categoria.
+    linhas = []
+    for cat, meta_cat in metas_por_cat.items():
+        gasto = gastos_por_cat_periodo.get(cat, 0.0)
+        perc = (gasto / meta_cat * 100.0) if meta_cat > 0 else 0.0
+        linhas.append((cat, gasto, meta_cat, round(perc, 1)))
+    return linhas
+
+
+# -----------------Ações que utilizam as funções puras -----------------
+def mostrarProgresso(meta_valor, saldo_atual):
+    if meta_valor and meta_valor > 0:
+        perc = (saldo_atual / meta_valor) * 100
+        restante = meta_valor - saldo_atual
+        if restante < 0:
+            restante = 0
+        print(f"Progresso da meta: {perc:.2f}% | faltam R$ {restante:.2f}")
+    else:
+        print("(Sem meta definida)")
+
+def cadastrarMeta():
+    global meta, metas_por_categoria
+    print("a) Meta GLOBAL (valor-alvo)")
+    print("b) Meta POR CATEGORIA")
+    tipo = input("Escolha (a/b): ").strip().lower()
+
+    if tipo == 'b':
+        cat = categorizar(categorias)
+        if not isinstance(cat, str):
+            return
+        eValido = False
+        while eValido == False:
+            v = input(f"Meta (valor não-negativo) para '{cat}': ")
+            eValido, msg = validaNum(v, 1)
+            print(msg)
+        metas_por_categoria = definir_meta_categoria_puro(metas_por_categoria, cat, v)
+        print(f"Meta da categoria '{cat}' definida em R$ {metas_por_categoria[cat]:.2f}")
+    else:
+        eValido = False
+        while eValido == False:
+            v = input('Qual valor deseja alcançar (global)? ')
+            eValido, msg = validaNum(v, 1)
+            print(msg)
+        meta = definir_meta_puro(meta, v)
+        prazo = input("Prazo (opcional YYYY-MM): ").strip()
+        if prazo:
+            print(f"Meta GLOBAL definida: R$ {meta:.2f} | prazo {prazo}")
+        else:
+            print(f"Meta GLOBAL definida: R$ {meta:.2f}")
+        mostrarProgresso(meta, saldo)
 
 def cadastrarCategoria():
     global categorias
@@ -164,117 +383,73 @@ def cadastrarCategoria():
     if nome in categorias:
         print("Categoria já existe.")
         return
-    categorias.append(nome)
+    categorias = adicionar_categoria_puro(categorias, nome)  # imutável
     print("Categoria cadastrada:", nome)
     print("Categorias atuais:", ", ".join(categorias))
 
+def _alertar_meta_categoria_pos_saida(extrato, categoria):
+    # usa mês atual para alertar imediatamente após a saída
+    hoje = date.today()
+    periodo = f"{hoje.year:04d}-{hoje.month:02d}"
+    res = resumo_periodo_puro(extrato, periodo)
+    if categoria in metas_por_categoria:
+        gasto = res['gastos_por_categoria'].get(categoria, 0.0)
+        alvo = metas_por_categoria[categoria]
+        if alvo > 0:
+            perc = (gasto / alvo) * 100.0
+            if perc >= 100:
+                print(f"[META/CATEGORIA] '{categoria}' estourou a meta! ({perc:.1f}%)")
+            elif perc >= 90:
+                print(f"[ALERTA/CATEGORIA] '{categoria}' em {perc:.1f}% da meta.")
 
-def validarPeriodo(s):
-    if not re.fullmatch(r"\d{4}-\d{2}", s or ""):
-        return False
-    ano, mes = s.split("-")
-    try:
-        m = int(mes)
-        return 1 <= m <= 12
-    except:
-        return False
-
-def selecionarPeriodo(inicial=False):
-    global periodo_atual
-    padrao = time.strftime("%Y-%m")
-    if inicial:
-        s = input(f"Informe o período atual (YYYY-MM) [Enter = {padrao}]: ").strip()
-        if not s:
-            periodo_atual = padrao
-            print("Período atual definido:", periodo_atual)
-            return
-    else:
-        s = input("Informe o novo período (YYYY-MM): ").strip()
-    if validarPeriodo(s):
-        periodo_atual = s
-        print("Período atual definido:", periodo_atual)
-    else:
-        print("Período inválido. Mantido:", periodo_atual or padrao)
-        if not periodo_atual:
-            periodo_atual = padrao
-
-def verAtingimentoMetasDoMes():
-    #Esta função só exibe, o cálculo vem da função pura
-    print(f"=== Atingimento de metas (período {periodo_atual}) ===")
-    gastos_mes = gastos_cat_por_periodo.get(periodo_atual, {})
-    if not metas_por_categoria:
-        print("(Sem metas por categoria definidas)")
-        return
-    for cat, alvo in metas_por_categoria.items():
-        gasto = gastos_mes.get(cat, 0.0)
-        perc = (gasto / alvo * 100) if alvo > 0 else 0.0
-        print(f"- {cat}: gasto R$ {gasto:.2f} / meta R$ {alvo:.2f} ({perc:.1f}%)")
-
-def verTop3GastosDoMes():
-    #Essa função só exibe, o cálculo vem da função pura
-    print(f"=== Top-3 gastos por categoria (período {periodo_atual}) ===")
-    gastos_mes = gastos_cat_por_periodo.get(periodo_atual, {})
-    if not gastos_mes:
-        print("(Sem despesas neste período)")
-        return
-    ordenado = sorted(gastos_mes.items(), key=lambda kv: kv[1], reverse=True)[:3]
-    for i, (cat, tot) in enumerate(ordenado, 1):
-        print(f"{i}) {cat}: R$ {tot:.2f}")
-
-selecionarPeriodo(inicial=True)
+saldo, meta, categorias, extrato = load_state(saldo, meta, categorias, extrato)
 
 while True:
-    imprimirMenu()
-    print(f"(Período atual: {periodo_atual})")  # feedback rápido
+    imprimirMenu(saldo)
 
     opc = input('Escolha uma Opção: ').strip()
     print()
 
     match opc:
         case '1':
-            saldo = entrada(saldo)
+            saldo, valor = entrada(saldo)
             print('Novo Saldo: ', saldo)
-            alertarMeta()
-            time.sleep(1)
+            extrato.append(['Valor:', valor, ' Saldo: ', saldo, ' - ', date.today()])
+            time.sleep(3)
+
         case '2':
-            saldo = saida(saldo)
+            saldo, valor = saida(saldo)
             categoria = categorizar(categorias)
-
-            gastos_por_categoria[categoria] = gastos_por_categoria.get(categoria, 0.0) + ultimo_movimento_valor
-
-            # para atender "agregações por mês e categoria"
-            gastos_cat_por_periodo.setdefault(periodo_atual, {})
-            gastos_cat_por_periodo[periodo_atual][categoria] = gastos_cat_por_periodo[periodo_atual].get(categoria, 0.0) + ultimo_movimento_valor
-
-            alertarMetaCategoria(categoria)
             print('Novo Saldo: ', saldo, ' Categoria: ', categoria)
-            time.sleep(1)
+            extrato.append(['Valor:', (valor * -1), ' Categoria: ', categoria, ' Saldo: ', saldo, ' - ', date.today()])
+            # alerta de meta por categoria (somente cálculo, não persiste nada)
+            _alertar_meta_categoria_pos_saida(extrato, categoria)
+            time.sleep(3)
+
         case '3':
-            print("a) Meta GLOBAL (objetivo: Viagem/Carro)")
-            print("b) Meta POR CATEGORIA")
-            esc = input("Escolha (a/b): ").strip().lower()
-            if esc == 'b':
-                cadastrarMetaCategoria()
-            else:
-                cadastrarMeta()
-            time.sleep(1)
+            cadastrarMeta()
+            time.sleep(2)
+
         case '4':
             cadastrarCategoria()
-            time.sleep(1)
+            time.sleep(2)
+
         case '5':
-            os.system('telnet towel.blinkenlights.nl')
+            listarExtrato(extrato)
+            input('[Pressione Enter]')
+
         case '6':
-            verAtingimentoMetasDoMes()
-            time.sleep(1)
+            os.system('telnet towel.blinkenlights.nl')
+
         case '7':
-            selecionarPeriodo(inicial=False)
-            time.sleep(1)
-        case '8':
-            verTop3GastosDoMes()
-            time.sleep(1)
+            save_state(saldo, meta, categorias, extrato)
+            print("Dados salvos em", ARQUIVO_DADOS)
+            time.sleep(2)
+
         case "0":
             print("→ Saindo...")
             raise SystemExit
+
         case _:
             print("Opção inválida.")
-            time.sleep(1)
+            time.sleep(3)
