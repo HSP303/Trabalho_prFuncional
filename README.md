@@ -64,7 +64,6 @@ python main.py
   - Verificação do **invariante** `receitas − despesas == Δsaldo`.
 - **Persistência** em `dados.csv` (saldo, meta global, categorias, extrato).
 
-> Obs.: as **metas por categoria** são mantidas **em memória**.
 
 ---
 
@@ -163,8 +162,6 @@ São persistidos:
 - **Categorias** (linhas `CATEGORIA`)
 - **Extrato** (linhas `EXTRATO`, com data ISO)
 
-> **Metas por categoria** (**não** são persistidas).
-
 ---
 
 ## Futuras melhorias
@@ -190,3 +187,4 @@ São persistidos:
 - **Autores**: Pedro Henrique Scheidt e Vinícius Minas
 - **Curso**: Sistemas de Informação — Linguagem de Programação e Paradigmas  
 - **Professor**: Ademar Perfoll Junior
+
