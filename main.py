@@ -11,7 +11,7 @@ meta = 10000
 saldo = 0
 extrato = []
 
-metas_por_categoria = {}  # ex.: {"Alimentação": 800.0}
+metas_por_categoria = {} 
 
 def _serializar_extrato_item(item):
     conv = []
@@ -22,7 +22,7 @@ def _serializar_extrato_item(item):
             conv.append(x)
     return conv
 
-
+# função para salvar o extrato e algumas variáveis em um arquivo CSV
 def save_state(saldo, meta, categorias, extrato, arquivo=ARQUIVO_DADOS):
     with open(arquivo, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -34,7 +34,7 @@ def save_state(saldo, meta, categorias, extrato, arquivo=ARQUIVO_DADOS):
         for item in extrato:
             w.writerow(["EXTRATO", repr(_serializar_extrato_item(item))])
 
-
+#  Função para carregar as informações do CSV
 def load_state(saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao, arquivo=ARQUIVO_DADOS):
     if not os.path.exists(arquivo):
         return saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao
@@ -79,7 +79,7 @@ def load_state(saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao, arq
         categorias = categorias_padrao[:]
     return saldo, meta, categorias, extrato
 
-
+# Função para printar o menu na tela
 def imprimirMenu(saldo):
     try:
         os.system('clear')
@@ -99,6 +99,7 @@ Saldo em conta: {saldo}
 0 - Sair
     """)
 
+# Função para validar entradas de valores numéricos (Inteiro ou Float)
 def validaNum(valor, floatInt):
 
     try:
@@ -118,6 +119,7 @@ def validaNum(valor, floatInt):
 
     return (True, '')
 
+# Função para retornar a soma do saldo com um valor inserido pelo usuário
 def entrada(saldo):
     eValido = False
     while eValido == False:
@@ -127,6 +129,7 @@ def entrada(saldo):
     valor = float(valor)
     return (sum([saldo, valor]), valor)
 
+# Função para retornar a subtração do saldo com um valor inserido pelo usuário
 def saida(saldo):
     eValido = False
     while eValido == False:
@@ -136,6 +139,7 @@ def saida(saldo):
     valor = float(valor)
     return ((saldo - valor), valor)
 
+# Verificar a categoria que o usuário insere
 def validaCategoria(i, categorias):
     eValido, msg = validaNum(i, 0)
     if not eValido:
@@ -145,6 +149,7 @@ def validaCategoria(i, categorias):
         return (False, 'Essa categoria não existe!')
     return (True, categorias[i - 1])
 
+# Função para o usuário inserir a categoria da saída de valor da conta
 def categorizar(categorias):
     eValido = False
     print('## Categorias de despesas ##')
@@ -157,6 +162,7 @@ def categorizar(categorias):
             print(msg)
     return msg
 
+# Função para listar o extrato na tela
 def listarExtrato(extrato):
     try:
         os.system('clear')
@@ -343,8 +349,7 @@ def mostrarProgresso(meta_valor, saldo_atual):
     else:
         print("(Sem meta definida)")
 
-def cadastrarMeta():
-    global meta, metas_por_categoria
+def cadastrarMeta(meta, metas_por_categoria):
     print("a) Meta GLOBAL (valor-alvo)")
     print("b) Meta POR CATEGORIA")
     tipo = input("Escolha (a/b): ").strip().lower()
@@ -373,9 +378,9 @@ def cadastrarMeta():
         else:
             print(f"Meta GLOBAL definida: R$ {meta:.2f}")
         mostrarProgresso(meta, saldo)
+    return (meta, metas_por_categoria)
 
-def cadastrarCategoria():
-    global categorias
+def cadastrarCategoria(categorias):
     nome = input("Nome da nova categoria: ").strip()
     if not nome:
         print("Categoria inválida.")
@@ -383,7 +388,7 @@ def cadastrarCategoria():
     if nome in categorias:
         print("Categoria já existe.")
         return
-    categorias = adicionar_categoria_puro(categorias, nome)  # imutável
+    return adicionar_categoria_puro(categorias, nome)  # imutável
     print("Categoria cadastrada:", nome)
     print("Categorias atuais:", ", ".join(categorias))
 
@@ -427,11 +432,11 @@ while True:
             time.sleep(3)
 
         case '3':
-            cadastrarMeta()
+            meta, metas_por_categoria = cadastrarMeta(meta, metas_por_categoria)
             time.sleep(2)
 
         case '4':
-            cadastrarCategoria()
+            categorias = cadastrarCategoria(categorias)
             time.sleep(2)
 
         case '5':
