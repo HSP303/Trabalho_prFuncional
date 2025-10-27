@@ -21,9 +21,8 @@ def _serializar_extrato_item(item):
         else:
             conv.append(x)
     return conv
-
 # função para salvar o extrato e algumas variáveis em um arquivo CSV
-def save_state(saldo, meta, categorias, extrato, arquivo=ARQUIVO_DADOS):
+def save_state(saldo, meta, categorias, extrato, metas_por_categoria, arquivo=ARQUIVO_DADOS):
     with open(arquivo, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["#versao", 1])
@@ -31,18 +30,22 @@ def save_state(saldo, meta, categorias, extrato, arquivo=ARQUIVO_DADOS):
         w.writerow(["CONFIG", "META", meta])
         for cat in categorias:
             w.writerow(["CATEGORIA", cat])
+        # NOVO: metas por categoria
+        for cat, alvo in metas_por_categoria.items():
+            w.writerow(["META_CATEGORIA", cat, alvo])
         for item in extrato:
             w.writerow(["EXTRATO", repr(_serializar_extrato_item(item))])
 
 #  Função para carregar as informações do CSV
-def load_state(saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao, arquivo=ARQUIVO_DADOS):
+def load_state(saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao, metas_por_categoria_padrao, arquivo=ARQUIVO_DADOS):
     if not os.path.exists(arquivo):
-        return saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao
+        return saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao, metas_por_categoria_padrao
 
     saldo = saldo_padrao
     meta = meta_padrao
     categorias = []
     extrato = []
+    metas_por_categoria = {}
 
     try:
         with open(arquivo, "r", newline="", encoding="utf-8") as f:
@@ -55,17 +58,19 @@ def load_state(saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao, arq
                     continue
                 if t == "CONFIG" and len(row) >= 3:
                     if row[1] == "SALDO":
-                        try:
-                            saldo = float(row[2])
-                        except:
-                            pass
+                        try: saldo = float(row[2])
+                        except: pass
                     elif row[1] == "META":
-                        try:
-                            meta = int(float(row[2]))
-                        except:
-                            pass
+                        try: meta = int(float(row[2]))
+                        except: pass
                 elif t == "CATEGORIA" and len(row) >= 2:
                     categorias.append(row[1])
+                elif t == "META_CATEGORIA" and len(row) >= 3:
+                    cat = row[1]
+                    try:
+                        metas_por_categoria[cat] = float(row[2])
+                    except:
+                        pass
                 elif t == "EXTRATO" and len(row) >= 2:
                     try:
                         item = ast.literal_eval(row[1])
@@ -73,11 +78,13 @@ def load_state(saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao, arq
                     except:
                         extrato.append([row[1]])
     except:
-        return saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao
+        return saldo_padrao, meta_padrao, categorias_padrao, extrato_padrao, metas_por_categoria_padrao
 
     if not categorias:
         categorias = categorias_padrao[:]
-    return saldo, meta, categorias, extrato
+    if not metas_por_categoria:
+        metas_por_categoria = metas_por_categoria_padrao.copy()
+    return saldo, meta, categorias, extrato, metas_por_categoria
 
 # Função para printar o menu na tela
 def imprimirMenu(saldo):
@@ -407,7 +414,9 @@ def _alertar_meta_categoria_pos_saida(extrato, categoria):
             elif perc >= 90:
                 print(f"[ALERTA/CATEGORIA] '{categoria}' em {perc:.1f}% da meta.")
 
-saldo, meta, categorias, extrato = load_state(saldo, meta, categorias, extrato)
+saldo, meta, categorias, extrato, metas_por_categoria = load_state(
+    saldo, meta, categorias, extrato, metas_por_categoria
+)
 
 while True:
     imprimirMenu(saldo)
@@ -447,7 +456,7 @@ while True:
             os.system('telnet towel.blinkenlights.nl')
 
         case '7':
-            save_state(saldo, meta, categorias, extrato)
+            save_state(saldo, meta, categorias, extrato, metas_por_categoria)
             print("Dados salvos em", ARQUIVO_DADOS)
             time.sleep(2)
 
