@@ -1,8 +1,12 @@
 #versao,1
-CONFIG,SALDO,6.0
-CONFIG,META,10000
+CONFIG,SALDO,50060.0
+CONFIG,META,30000.0
 CATEGORIA,Contas
 CATEGORIA,Superficial
-EXTRATO,"['Valor:', 60.0, ' Saldo: ', 60.0, ' - ', '2025-10-26']"
-EXTRATO,"['Valor:', -50.0, ' Categoria: ', 'Contas', ' Saldo: ', 10.0, ' - ', '2025-10-26']"
-EXTRATO,"['Valor:', -4.0, ' Categoria: ', 'Superficial', ' Saldo: ', 6.0, ' - ', '2025-10-26']"
+CATEGORIA,Carro
+EXTRATO,"['Valor:', 0.0, ' Saldo: ', 0.0, ' - ', '2025-10-27']"
+EXTRATO,"['Valor:', 55555.0, ' Saldo: ', 55555.0, ' - ', '2025-10-27']"
+EXTRATO,"['Valor:', 5.0, ' Saldo: ', 55560.0, ' - ', '2025-10-27']"
+EXTRATO,"['Valor:', -500.0, ' Categoria: ', 'Contas', ' Saldo: ', 55060.0, ' - ', '2025-10-27']"
+EXTRATO,"['Valor:', -5000.0, ' Categoria: ', 'Carro', ' Saldo: ', 50060.0, ' - ', '2025-10-27']"
+
